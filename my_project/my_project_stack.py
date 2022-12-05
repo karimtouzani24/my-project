@@ -1,5 +1,5 @@
 from aws_cdk import (
-    # Duration,
+    
     Stack,
     # aws_sqs as sqs,
 )
@@ -15,5 +15,4 @@ class MyProjectStack(Stack):
         # example resource
         # queue = sqs.Queue(
         #     self, "MyProjectQueue",
-        #     visibility_timeout=Duration.seconds(300),
         # )
