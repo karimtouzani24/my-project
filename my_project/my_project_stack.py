@@ -174,6 +174,3 @@ class MyProjectStack(Stack):
         #     sources=[s3deploy.Source.asset("./website-dist?")],
         #     destination_bucket= bucket,
         # )
-
-        # 
-        
