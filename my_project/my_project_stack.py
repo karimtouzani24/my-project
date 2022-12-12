@@ -2,6 +2,7 @@ import aws_cdk as cdk
 from aws_cdk import (
     aws_ec2 as ec2,
     aws_s3 as s3,
+    aws_s3_deployment as s3deploy,
     Stack,    
 )
 from constructs import Construct
@@ -52,6 +53,25 @@ class MyProjectStack(Stack):
             peer_vpc_id= vpc1.vpc_id,
             vpc_id= vpc2.vpc_id
         )
+
+        # # creating route 
+        # for i in range(0, 1):
+        #     ec2.CfnRoute(
+        #         self,
+        #         "RouteVPC1-2",
+        #         route_table_id=,
+        #         destination_cidr_block=,
+        #         vpc_peering_connection_id=
+        #     )
+
+        # for i in range(0, 1):
+        #     ec2.CfnRoute(
+        #         self,
+        #         "RouteVPC2-1",
+        #         route_table_id=,
+        #         destination_cidr_block=,
+        #         vpc_peering_connection_id=
+        #     )
 
         # creating linux AMI for the WEB server.
         amzn_linux = ec2.MachineImage.latest_amazon_linux(
@@ -141,10 +161,19 @@ class MyProjectStack(Stack):
         # creating a bucket
         bucket = s3.Bucket(
             self, 
-            "project_backup_bucket",
+            "project_bucket",
+            bucket_name= "project-bucket",
             encryption= s3.BucketEncryption.KMS,
             versioned= True,
             removal_policy= cdk.RemovalPolicy.DESTROY,
             auto_delete_objects= True
         )
-                  
+        # s3deploy.BucketDeployment(
+        #     self, 
+        #     "DeployS3",
+        #     sources=[s3deploy.Source.asset("./website-dist?")],
+        #     destination_bucket= bucket,
+        # )
+
+        # 
+        
