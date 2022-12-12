@@ -3,6 +3,7 @@ from aws_cdk import (
     aws_ec2 as ec2,
     aws_s3 as s3,
     aws_s3_deployment as s3deploy,
+    aws_kms as kms,
     Stack,    
 )
 from constructs import Construct
@@ -29,6 +30,12 @@ class MyProjectStack(Stack):
                     cidr_mask= 26)]
         )
 
+        # creating a route table for vpc1
+        route_table_vpc1 = ec2.CfnRouteTable(
+            self, 
+            "RouteTableVPC1",
+            vpc_id= vpc1.vpc_id
+        )
         # creating vpc, managment server.
         vpc2 = ec2.Vpc(
             self, 
@@ -46,6 +53,13 @@ class MyProjectStack(Stack):
                     cidr_mask=26,)]
         )
 
+        # creating a route table for vpc1
+        route_table_vpc2 = ec2.CfnRouteTable(
+            self, 
+            "RouteTableVPC2",
+            vpc_id= vpc2.vpc_id
+        )
+
         # creating a vpc peering connection.
         cfn_cPCPeering_connection = ec2.CfnVPCPeeringConnection(
             self, 
@@ -54,24 +68,24 @@ class MyProjectStack(Stack):
             vpc_id= vpc2.vpc_id
         )
 
-        # # creating route 
-        # for i in range(0, 1):
-        #     ec2.CfnRoute(
-        #         self,
-        #         "RouteVPC1-2",
-        #         route_table_id=,
-        #         destination_cidr_block=,
-        #         vpc_peering_connection_id=
-        #     )
+        # creating route 
+        for i in range(0, 1):
+            ec2.CfnRoute(
+                self,
+                "RouteVPC1-2",
+                route_table_id= route_table_vpc1.attr_route_table_id,
+                destination_cidr_block= vpc2.vpc_cidr_block,
+                vpc_peering_connection_id= cfn_cPCPeering_connection.attr_id
+            )
 
-        # for i in range(0, 1):
-        #     ec2.CfnRoute(
-        #         self,
-        #         "RouteVPC2-1",
-        #         route_table_id=,
-        #         destination_cidr_block=,
-        #         vpc_peering_connection_id=
-        #     )
+        for i in range(0, 1):
+            ec2.CfnRoute(
+                self,
+                "RouteVPC2-1",
+                route_table_id= route_table_vpc2.attr_route_table_id,
+                destination_cidr_block= vpc1.vpc_cidr_block,
+                vpc_peering_connection_id= cfn_cPCPeering_connection.attr_id
+            )
 
         # creating linux AMI for the WEB server.
         amzn_linux = ec2.MachineImage.latest_amazon_linux(
@@ -94,6 +108,8 @@ class MyProjectStack(Stack):
             instance_type= ec2.InstanceType.of(
                 ec2.InstanceClass.T2,
                 ec2.InstanceSize.MICRO)
+            # security_group=,
+            # key_name=,
         )
 
         #creating instance, MMGMT serever, windows.
@@ -105,6 +121,8 @@ class MyProjectStack(Stack):
             instance_type= ec2.InstanceType.of(
                 ec2.InstanceClass.T2,
                 ec2.InstanceSize.MICRO)
+            # security_group=,
+            # key_name=
         )
 
         # creating SG webserver
@@ -162,7 +180,7 @@ class MyProjectStack(Stack):
         bucket = s3.Bucket(
             self, 
             "project_bucket",
-            bucket_name= "project-bucket",
+            bucket_name= "bucket-project-karim24",
             encryption= s3.BucketEncryption.KMS,
             versioned= True,
             removal_policy= cdk.RemovalPolicy.DESTROY,
@@ -174,3 +192,20 @@ class MyProjectStack(Stack):
         #     sources=[s3deploy.Source.asset("./website-dist?")],
         #     destination_bucket= bucket,
         # )
+
+        # mngmt_kms = kms.Key(self, "mngmtKey",
+            # enable_key_rotation= True,)
+        
+        mngmt_key_pair = ec2.CfnKeyPair(
+            self, 
+            "MngmtKeyPair",
+            key_name="mngmtKey",
+        )
+
+        websrv_key_pair = ec2.CfnKeyPair(
+            self, 
+            "WebsrvKeyPair",
+            key_name="websrvKey",
+        )
+
+        
