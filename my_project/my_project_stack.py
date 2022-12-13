@@ -250,7 +250,7 @@ class MyProjectStack(Stack):
 
         mngmnt_NACL.add_entry(
             id = "allow RDP inbound",
-            cidr = ec2.AclCidr.ipv4(trusted_ip), 
+            cidr = ec2.AclCidr.ipv4("192.168.178.1/24"), #temporarely ip address 
             rule_number = 160,
             traffic = ec2.AclTraffic.tcp_port(3389),
             direction = ec2.TrafficDirection.INGRESS,
