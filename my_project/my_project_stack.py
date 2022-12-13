@@ -17,17 +17,13 @@ class MyProjectStack(Stack):
         vpc1 = ec2.Vpc(
             self, 
             "Vpc_W",
-            max_azs=2,
+            availability_zones=["eu-central-1a", "eu-central-1b"],
             ip_addresses=ec2.IpAddresses.cidr("10.10.10.0/24"),
             subnet_configuration=[
                 ec2.SubnetConfiguration(
-                    name="Public_subnet_W1",
+                    name="Public",
                     subnet_type=ec2.SubnetType.PUBLIC,
-                    cidr_mask = 26),
-                ec2.SubnetConfiguration(
-                    name="Public_subnet_W2",
-                    subnet_type=ec2.SubnetType.PUBLIC,
-                    cidr_mask= 26)]
+                    cidr_mask = 26)],
         )
 
         # creating a route table for vpc1
@@ -40,20 +36,16 @@ class MyProjectStack(Stack):
         vpc2 = ec2.Vpc(
             self, 
             "Vpc_M",
-            max_azs=2,
+            availability_zones=["eu-central-1a", "eu-central-1b"],
             ip_addresses=ec2.IpAddresses.cidr("10.20.20.0/24"),
             subnet_configuration=[
                 ec2.SubnetConfiguration(
-                    name="Public_subnet_M1",
+                    name="Public",
                     subnet_type=ec2.SubnetType.PUBLIC,
-                    cidr_mask=26,),
-                ec2.SubnetConfiguration(
-                    name="Public_subnet_M2",
-                    subnet_type=ec2.SubnetType.PUBLIC,
-                    cidr_mask=26,)]
+                    cidr_mask=26,),]
         )
 
-        # creating a route table for vpc1
+        # creating a route table for vpc2
         route_table_vpc2 = ec2.CfnRouteTable(
             self, 
             "RouteTableVPC2",
@@ -69,61 +61,24 @@ class MyProjectStack(Stack):
         )
 
         # creating route 
-        for i in range(0, 1):
-            ec2.CfnRoute(
+        cfn_Route= ec2.CfnRoute(
                 self,
                 "RouteVPC1-2",
-                route_table_id= route_table_vpc1.attr_route_table_id,
+                # route_table_id= route_table_vpc1.attr_route_table_id,
+                route_table_id= vpc1.public_subnets[0].route_table.route_table_id,
                 destination_cidr_block= vpc2.vpc_cidr_block,
-                vpc_peering_connection_id= cfn_cPCPeering_connection.attr_id
+                vpc_peering_connection_id= cfn_cPCPeering_connection.ref
             )
 
-        for i in range(0, 1):
-            ec2.CfnRoute(
+
+        cfn_Route= ec2.CfnRoute(
                 self,
                 "RouteVPC2-1",
-                route_table_id= route_table_vpc2.attr_route_table_id,
+                # route_table_id= route_table_vpc2.attr_route_table_id,
+                route_table_id= vpc2.public_subnets[1].route_table.route_table_id,
                 destination_cidr_block= vpc1.vpc_cidr_block,
-                vpc_peering_connection_id= cfn_cPCPeering_connection.attr_id
+                vpc_peering_connection_id= cfn_cPCPeering_connection.ref
             )
-
-        # creating linux AMI for the WEB server.
-        amzn_linux = ec2.MachineImage.latest_amazon_linux(
-            generation=ec2.AmazonLinuxGeneration.AMAZON_LINUX_2,
-            edition=ec2.AmazonLinuxEdition.STANDARD,
-            storage=ec2.AmazonLinuxStorage.GENERAL_PURPOSE
-        )
-       
-       #creating Windows Ami for the MGMT server.
-        amzn_windows = ec2.MachineImage.latest_windows(
-            version=ec2.WindowsVersion.WINDOWS_SERVER_2022_ENGLISH_FULL_BASE
-        )
-
-       #creating instance, WEB server, linux.
-        web_server = ec2.Instance(
-            self, 
-            "web_instance",
-            vpc= vpc1,
-            machine_image= amzn_linux,
-            instance_type= ec2.InstanceType.of(
-                ec2.InstanceClass.T2,
-                ec2.InstanceSize.MICRO)
-            # security_group=,
-            # key_name=,
-        )
-
-        #creating instance, MMGMT serever, windows.
-        mngmt_server = ec2.Instance(
-            self, 
-            "mngmt_instance",
-            vpc= vpc2,
-            machine_image= amzn_windows,
-            instance_type= ec2.InstanceType.of(
-                ec2.InstanceClass.T2,
-                ec2.InstanceSize.MICRO)
-            # security_group=,
-            # key_name=
-        )
 
         # creating SG webserver
         webserver_SG = ec2.SecurityGroup(
@@ -175,7 +130,218 @@ class MyProjectStack(Stack):
             connection= ec2.Port.tcp(3389),
             description= "allow rdp, admin ip"
         )
-        
+
+        # creating NACL for webserver.
+        web_NACL= ec2.NetworkAcl(
+            self,
+            "web_NACL",
+            vpc= vpc1,
+            subnet_selection= ec2.SubnetSelection(
+                subnet_type= ec2.SubnetType.PUBLIC)
+        )
+
+        web_NACL.add_entry(
+            id= "allow HTTP inbound",
+            cidr= ec2.AclCidr.any_ipv4(),
+            rule_number= 100,
+            traffic= ec2.AclTraffic.tcp_port(80),
+            direction= ec2.TrafficDirection.INGRESS,
+            rule_action= ec2.Action.ALLOW,
+        )
+
+        web_NACL.add_entry(
+            id= "allow HTTP outbound",
+            cidr= ec2.AclCidr.any_ipv4(),
+            rule_number= 100,
+            traffic= ec2.AclTraffic.tcp_port(80),
+            direction= ec2.TrafficDirection.EGRESS,
+            rule_action= ec2.Action.ALLOW,
+        )
+
+        web_NACL.add_entry(
+            id= "allow HTTPS inbound",
+            cidr= ec2.AclCidr.any_ipv4(),
+            rule_number= 110,
+            traffic= ec2.AclTraffic.tcp_port(443),
+            direction= ec2.TrafficDirection.INGRESS,
+            rule_action= ec2.Action.ALLOW,
+        )
+
+        web_NACL.add_entry(
+            id= "allow HTTPS outbound",
+            cidr= ec2.AclCidr.any_ipv4(),
+            rule_number= 110,
+            traffic= ec2.AclTraffic.tcp_port(443),
+            direction= ec2.TrafficDirection.EGRESS,
+            rule_action= ec2.Action.ALLOW,
+        )
+
+        web_NACL.add_entry(
+            id= "allow ephemeral inbound",
+            cidr= ec2.AclCidr.any_ipv4(),
+            rule_number= 120,
+            traffic= ec2.AclTraffic.tcp_port_range(1024, 65535),
+            direction= ec2.TrafficDirection.INGRESS,
+            rule_action= ec2.Action.ALLOW,
+        )
+
+        web_NACL.add_entry(
+            id= "allow ephemerel outbound",
+            cidr= ec2.AclCidr.any_ipv4,
+            rule_number= 120,
+            traffic= ec2.AclTraffic.tcp_port_range(1024, 65535),
+            direction= ec2.TrafficDirection.EGRESS,
+            rule_action= ec2.Action.ALLOW,
+        )
+
+        web_NACL.add_entry(
+            id= "allow SSH inbound",
+            cidr= ec2.AclCidr.any_ipv4(),
+            rule_number= 130,
+            traffic= ec2.AclTraffic.tcp_port(22),
+            direction= ec2.TrafficDirection.INGRESS,
+            rule_action= ec2.Action.ALLOW,
+        )
+
+        # creating NACL for MNGMT server.
+        mngmnt_NACL= ec2.NetworkAcl(
+            self,
+            "mngmnt_NACL",
+            vpc= vpc2,
+            subnet_selection= ec2.SubnetSelection(
+                subnet_type= ec2.SubnetType.PUBLIC)
+        )
+
+        mngmnt_NACL.add_entry(
+            id= "allow SSH inbound",
+            cidr= ec2.AclCidr.ipv4("192.168.178.1/24"),
+            rule_number= 140,
+            traffic= ec2.AclTraffic.tcp_port(22),
+            direction= ec2.TrafficDirection.INGRESS,
+            rule_action= ec2.Action.ALLOW,
+        )
+
+        mngmnt_NACL.add_entry(
+            id = "allow SSH outbound",
+            cidr = ec2.AclCidr.any_ipv4(), 
+            rule_number = 140,
+            traffic = ec2.AclTraffic.tcp_port(22),
+            direction = ec2.TrafficDirection.EGRESS,
+            rule_action = ec2.Action.ALLOW,
+        )
+
+        mngmnt_NACL.add_entry(
+            id = "allow ephemeral inbound",
+            cidr = ec2.AclCidr.any_ipv4(), 
+            rule_number = 150,
+            traffic = ec2.AclTraffic.tcp_port_range(1024, 65535),
+            direction = ec2.TrafficDirection.INGRESS,
+            rule_action = ec2.Action.ALLOW,
+        )
+
+        mngmnt_NACL.add_entry(
+            id = "allow ephemeral outbound",
+            cidr = ec2.AclCidr.any_ipv4(), 
+            rule_number = 150,
+            traffic = ec2.AclTraffic.tcp_port_range(1024, 65535),
+            direction = ec2.TrafficDirection.EGRESS,
+            rule_action = ec2.Action.ALLOW,
+        )
+
+        mngmnt_NACL.add_entry(
+            id = "allow RDP inbound",
+            cidr = ec2.AclCidr.ipv4(trusted_ip), 
+            rule_number = 160,
+            traffic = ec2.AclTraffic.tcp_port(3389),
+            direction = ec2.TrafficDirection.INGRESS,
+            rule_action = ec2.Action.ALLOW,
+        )
+
+        mngmnt_NACL.add_entry(
+            id = "allow RDP outbound",
+            cidr = ec2.AclCidr.any_ipv4(), 
+            rule_number = 160,
+            traffic = ec2.AclTraffic.tcp_port(3389),
+            direction = ec2.TrafficDirection.EGRESS,
+            rule_action = ec2.Action.ALLOW,
+        )
+
+        mngmnt_NACL.add_entry(
+            id = "allow HTTP inbound",
+            cidr = ec2.AclCidr.any_ipv4(), 
+            rule_number = 170,
+            traffic = ec2.AclTraffic.tcp_port(80),
+            direction = ec2.TrafficDirection.INGRESS,
+            rule_action = ec2.Action.ALLOW,
+        )
+
+        mngmnt_NACL.add_entry(
+            id = "allow HTTP outbound",
+            cidr = ec2.AclCidr.any_ipv4(), 
+            rule_number = 170,
+            traffic = ec2.AclTraffic.tcp_port(80),
+            direction = ec2.TrafficDirection.EGRESS,
+            rule_action = ec2.Action.ALLOW,
+        )
+
+        mngmnt_NACL.add_entry(
+            id = "allow HTTPS inbound",
+            cidr = ec2.AclCidr.any_ipv4(), 
+            rule_number = 170,
+            traffic = ec2.AclTraffic.tcp_port(443),
+            direction = ec2.TrafficDirection.INGRESS,
+            rule_action = ec2.Action.ALLOW,
+        )
+
+        mngmnt_NACL.add_entry(
+            id = "allow HTTPS outbound",
+            cidr = ec2.AclCidr.any_ipv4(), 
+            rule_number = 170,
+            traffic = ec2.AclTraffic.tcp_port(443),
+            direction = ec2.TrafficDirection.EGRESS,
+            rule_action = ec2.Action.ALLOW,
+        )
+
+        # creating linux AMI for the WEB server.
+        amzn_linux = ec2.MachineImage.latest_amazon_linux(
+            generation=ec2.AmazonLinuxGeneration.AMAZON_LINUX_2,
+            edition=ec2.AmazonLinuxEdition.STANDARD,
+            storage=ec2.AmazonLinuxStorage.GENERAL_PURPOSE
+        )
+       
+       #creating Windows Ami for the MGMT server.
+        amzn_windows = ec2.MachineImage.latest_windows(
+            version=ec2.WindowsVersion.WINDOWS_SERVER_2022_ENGLISH_FULL_BASE
+        )
+
+       #creating instance, WEB server, linux.
+        web_server = ec2.Instance(
+            self, 
+            "web_instance",
+            vpc= vpc1,
+            availability_zone= "eu-central-1a",
+            machine_image= amzn_linux,
+            security_group= webserver_SG,
+            # key_name= ,
+            instance_type= ec2.InstanceType.of(
+                ec2.InstanceClass.T2,
+                ec2.InstanceSize.MICRO)
+        )
+
+        #creating instance, MMGMT serever, windows.
+        mngmt_server = ec2.Instance(
+            self, 
+            "mngmt_instance",
+            vpc= vpc2,
+            availability_zone= "eu-central-1b",
+            machine_image= amzn_windows,
+            security_group= mngmt_SG,
+            # key_name= ,
+            instance_type= ec2.InstanceType.of(
+                ec2.InstanceClass.T2,
+                ec2.InstanceSize.MICRO)
+        )
+
         # creating a bucket
         bucket = s3.Bucket(
             self, 
@@ -196,16 +362,16 @@ class MyProjectStack(Stack):
         # mngmt_kms = kms.Key(self, "mngmtKey",
             # enable_key_rotation= True,)
         
-        mngmt_key_pair = ec2.CfnKeyPair(
-            self, 
-            "MngmtKeyPair",
-            key_name="mngmtKey",
-        )
+        # mngmt_key_pair = ec2.CfnKeyPair(
+        #     self, 
+        #     "MngmtKeyPair",
+        #     key_name="mngmtKey",
+        # )
 
-        websrv_key_pair = ec2.CfnKeyPair(
-            self, 
-            "WebsrvKeyPair",
-            key_name="websrvKey",
-        )
+        # websrv_key_pair = ec2.CfnKeyPair(
+        #     self, 
+        #     "WebsrvKeyPair",
+        #     key_name="websrvKey",
+        # )
 
         
