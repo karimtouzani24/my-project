@@ -1,5 +1,6 @@
 #!/bin/bash
 
-sudo yum -y install httpd
-sudo systemctl enable httpd
-sudo systemctl start httpd
+sudo yum update -y
+sudo yum install httpd -y
+sudo service httpd start
+sudo service httpd enable

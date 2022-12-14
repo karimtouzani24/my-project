@@ -27,11 +27,12 @@ class MyProjectStack(Stack):
         )
 
         # creating a route table for vpc1
-        route_table_vpc1 = ec2.CfnRouteTable(
-            self, 
-            "RouteTableVPC1",
-            vpc_id= vpc1.vpc_id
-        )
+        # route_table_vpc1 = ec2.CfnRouteTable(
+        #     self, 
+        #     "RouteTableVPC1",
+        #     vpc_id= vpc1.vpc_id
+        # )
+
         # creating vpc, managment server.
         vpc2 = ec2.Vpc(
             self, 
@@ -45,12 +46,12 @@ class MyProjectStack(Stack):
                     cidr_mask=26,),]
         )
 
-        # creating a route table for vpc2
-        route_table_vpc2 = ec2.CfnRouteTable(
-            self, 
-            "RouteTableVPC2",
-            vpc_id= vpc2.vpc_id
-        )
+        # # creating a route table for vpc2
+        # route_table_vpc2 = ec2.CfnRouteTable(
+        #     self, 
+        #     "RouteTableVPC2",
+        #     vpc_id= vpc2.vpc_id
+        # )
 
         # creating a vpc peering connection.
         cfn_cPCPeering_connection = ec2.CfnVPCPeeringConnection(
@@ -68,6 +69,7 @@ class MyProjectStack(Stack):
         #         destination_cidr_block= vpc2.vpc_cidr_block,
         #         vpc_peering_connection_id= cfn_cPCPeering_connection.ref
             # )
+
         for subnet in vpc1.public_subnets:
             self.cfn_Route= ec2.CfnRoute(
                 self,
@@ -136,12 +138,12 @@ class MyProjectStack(Stack):
             description= "allow https"
         )
         mngmt_SG.add_ingress_rule(
-            peer= ec2.Peer.ipv4("192.168.178.1/24"), #temporarely ip address
+            peer= ec2.Peer.ipv4("89.99.59.255/24"), #temporarely ip address
             connection= ec2.Port.tcp(22),
             description= "allow ssh, admin ip"
         )
         mngmt_SG.add_ingress_rule(
-            peer= ec2.Peer.ipv4("192.168.178.1/24"), #temporarely ip address
+            peer= ec2.Peer.ipv4("89.99.59.255/24"), #temporarely ip address
             connection= ec2.Port.tcp(3389),
             description= "allow rdp, admin ip"
         )
@@ -337,7 +339,7 @@ class MyProjectStack(Stack):
             availability_zone= "eu-central-1a",
             machine_image= amzn_linux,
             security_group= webserver_SG,
-            # key_name= ,
+            key_name= "Karim_KP",
             instance_type= ec2.InstanceType.of(
                 ec2.InstanceClass.T2,
                 ec2.InstanceSize.MICRO),
@@ -359,7 +361,7 @@ class MyProjectStack(Stack):
             availability_zone= "eu-central-1b",
             machine_image= amzn_windows,
             security_group= mngmt_SG,
-            # key_name= ,
+            key_name= "Karim_KP",
             instance_type= ec2.InstanceType.of(
                 ec2.InstanceClass.T2,
                 ec2.InstanceSize.MICRO),
@@ -383,13 +385,33 @@ class MyProjectStack(Stack):
             removal_policy= cdk.RemovalPolicy.DESTROY,
             auto_delete_objects= True
         )
-        
-        # userdate_upload= s3deploy.BucketDeployment(
-        #     self, 
-        #     "DeployS3",
-        #     sources=[s3deploy.Source.asset("./website-dist?")],
-        #     destination_bucket= bucket,
+        # upload a files in the bucket.
+        userdate_upload= s3deploy.BucketDeployment(
+            self, 
+            "DeployS3",
+            sources=[s3deploy.Source.asset("./asset-folder")],
+            destination_bucket= bucket,
+        )
+        bucket.grant_read(web_server)
+
+        web_userdata= web_server.user_data.add_s3_download_command(
+            bucket= bucket,
+            bucket_key= "webserver_userdata.sh",
+        )
+
+        web_server.user_data.add_execute_file_command(file_path= web_userdata)
+
+        # web_server.user_data.add_s3_download_command(
+        #     bucket= bucket,
+        #     bucket_key= "index.html"
         # )
+
+        
+
+        # web_server.user_data.add_commands("chmod 755 -R /var/www/html/")
+
+        # web_server.user_data.add_execute_file_command(file_path= "/var/www/html")
+        
 
         # mngmt_kms = kms.Key(self, "mngmtKey",
             # enable_key_rotation= True,)
