@@ -61,21 +61,36 @@ class MyProjectStack(Stack):
         )
 
         # creating route 
-        cfn_Route= ec2.CfnRoute(
+        # cfn_Route= ec2.CfnRoute(
+        #         self,
+        #         "RouteVPC1-2",
+        #         route_table_id= vpc1.public_subnets[0].route_table.route_table_id,
+        #         destination_cidr_block= vpc2.vpc_cidr_block,
+        #         vpc_peering_connection_id= cfn_cPCPeering_connection.ref
+            # )
+        for subnet in vpc1.public_subnets:
+            self.cfn_Route= ec2.CfnRoute(
                 self,
-                "RouteVPC1-2",
-                # route_table_id= route_table_vpc1.attr_route_table_id,
-                route_table_id= vpc1.public_subnets[0].route_table.route_table_id,
+                id=f"{subnet.node.id} RouteVPC1-2",
+                route_table_id= subnet.route_table.route_table_id,
                 destination_cidr_block= vpc2.vpc_cidr_block,
                 vpc_peering_connection_id= cfn_cPCPeering_connection.ref
+            # )
             )
 
+        # cfn_Route= ec2.CfnRoute(
+        #         self,
+        #         "RouteVPC2-1",
+        #         route_table_id= vpc2.public_subnets[1].route_table.route_table_id,
+        #         destination_cidr_block= vpc1.vpc_cidr_block,
+        #         vpc_peering_connection_id= cfn_cPCPeering_connection.ref
+        #     )
 
-        cfn_Route= ec2.CfnRoute(
+        for subnet in vpc2.public_subnets:
+            self.cfn_Route= ec2.CfnRoute(
                 self,
-                "RouteVPC2-1",
-                # route_table_id= route_table_vpc2.attr_route_table_id,
-                route_table_id= vpc2.public_subnets[1].route_table.route_table_id,
+                id= f"{subnet.node.id} RouteVPC2-1",
+                route_table_id= subnet.route_table.route_table_id,
                 destination_cidr_block= vpc1.vpc_cidr_block,
                 vpc_peering_connection_id= cfn_cPCPeering_connection.ref
             )
@@ -187,7 +202,7 @@ class MyProjectStack(Stack):
 
         web_NACL.add_entry(
             id= "allow ephemerel outbound",
-            cidr= ec2.AclCidr.any_ipv4,
+            cidr= ec2.AclCidr.any_ipv4(),
             rule_number= 120,
             traffic= ec2.AclTraffic.tcp_port_range(1024, 65535),
             direction= ec2.TrafficDirection.EGRESS,
@@ -287,7 +302,7 @@ class MyProjectStack(Stack):
         mngmnt_NACL.add_entry(
             id = "allow HTTPS inbound",
             cidr = ec2.AclCidr.any_ipv4(), 
-            rule_number = 170,
+            rule_number = 180,
             traffic = ec2.AclTraffic.tcp_port(443),
             direction = ec2.TrafficDirection.INGRESS,
             rule_action = ec2.Action.ALLOW,
@@ -296,7 +311,7 @@ class MyProjectStack(Stack):
         mngmnt_NACL.add_entry(
             id = "allow HTTPS outbound",
             cidr = ec2.AclCidr.any_ipv4(), 
-            rule_number = 170,
+            rule_number = 180,
             traffic = ec2.AclTraffic.tcp_port(443),
             direction = ec2.TrafficDirection.EGRESS,
             rule_action = ec2.Action.ALLOW,
@@ -325,7 +340,15 @@ class MyProjectStack(Stack):
             # key_name= ,
             instance_type= ec2.InstanceType.of(
                 ec2.InstanceClass.T2,
-                ec2.InstanceSize.MICRO)
+                ec2.InstanceSize.MICRO),
+            block_devices= [ec2.BlockDevice(
+                device_name= "/dev/xvda",
+                volume= ec2.BlockDeviceVolume.ebs(
+                    volume_size= 8,
+                    encrypted= True,
+                    delete_on_termination= True,
+                )
+            )]
         )
 
         #creating instance, MMGMT serever, windows.
@@ -339,7 +362,15 @@ class MyProjectStack(Stack):
             # key_name= ,
             instance_type= ec2.InstanceType.of(
                 ec2.InstanceClass.T2,
-                ec2.InstanceSize.MICRO)
+                ec2.InstanceSize.MICRO),
+            block_devices= [ec2.BlockDevice(
+                device_name= "/dev/sda1",
+                volume= ec2.BlockDeviceVolume.ebs(
+                    volume_size= 30,
+                    encrypted= True,
+                    delete_on_termination= True,
+                )
+            )]
         )
 
         # creating a bucket
@@ -352,7 +383,8 @@ class MyProjectStack(Stack):
             removal_policy= cdk.RemovalPolicy.DESTROY,
             auto_delete_objects= True
         )
-        # s3deploy.BucketDeployment(
+        
+        # userdate_upload= s3deploy.BucketDeployment(
         #     self, 
         #     "DeployS3",
         #     sources=[s3deploy.Source.asset("./website-dist?")],
