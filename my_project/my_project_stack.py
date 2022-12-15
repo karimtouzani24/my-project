@@ -23,9 +23,9 @@ class MyProjectStack(Stack):
                 ec2.SubnetConfiguration(
                     name="Public",
                     subnet_type=ec2.SubnetType.PUBLIC,
-                    cidr_mask = 26)],
+                    cidr_mask = 25)],
         )
-        
+
         # creating vpc, managment server.
         vpc2 = ec2.Vpc(
             self, 
@@ -36,7 +36,7 @@ class MyProjectStack(Stack):
                 ec2.SubnetConfiguration(
                     name="Public",
                     subnet_type=ec2.SubnetType.PUBLIC,
-                    cidr_mask=26,),]
+                    cidr_mask=25,),]
         )
 
         # creating a vpc peering connection.
