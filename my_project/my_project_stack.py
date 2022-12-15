@@ -25,14 +25,7 @@ class MyProjectStack(Stack):
                     subnet_type=ec2.SubnetType.PUBLIC,
                     cidr_mask = 26)],
         )
-
-        # creating a route table for vpc1
-        # route_table_vpc1 = ec2.CfnRouteTable(
-        #     self, 
-        #     "RouteTableVPC1",
-        #     vpc_id= vpc1.vpc_id
-        # )
-
+        
         # creating vpc, managment server.
         vpc2 = ec2.Vpc(
             self, 
@@ -46,13 +39,6 @@ class MyProjectStack(Stack):
                     cidr_mask=26,),]
         )
 
-        # # creating a route table for vpc2
-        # route_table_vpc2 = ec2.CfnRouteTable(
-        #     self, 
-        #     "RouteTableVPC2",
-        #     vpc_id= vpc2.vpc_id
-        # )
-
         # creating a vpc peering connection.
         cfn_cPCPeering_connection = ec2.CfnVPCPeeringConnection(
             self, 
@@ -60,15 +46,6 @@ class MyProjectStack(Stack):
             peer_vpc_id= vpc1.vpc_id,
             vpc_id= vpc2.vpc_id
         )
-
-        # creating route 
-        # cfn_Route= ec2.CfnRoute(
-        #         self,
-        #         "RouteVPC1-2",
-        #         route_table_id= vpc1.public_subnets[0].route_table.route_table_id,
-        #         destination_cidr_block= vpc2.vpc_cidr_block,
-        #         vpc_peering_connection_id= cfn_cPCPeering_connection.ref
-            # )
 
         for subnet in vpc1.public_subnets:
             self.cfn_Route= ec2.CfnRoute(
@@ -79,14 +56,6 @@ class MyProjectStack(Stack):
                 vpc_peering_connection_id= cfn_cPCPeering_connection.ref
             # )
             )
-
-        # cfn_Route= ec2.CfnRoute(
-        #         self,
-        #         "RouteVPC2-1",
-        #         route_table_id= vpc2.public_subnets[1].route_table.route_table_id,
-        #         destination_cidr_block= vpc1.vpc_cidr_block,
-        #         vpc_peering_connection_id= cfn_cPCPeering_connection.ref
-        #     )
 
         for subnet in vpc2.public_subnets:
             self.cfn_Route= ec2.CfnRoute(
@@ -116,6 +85,12 @@ class MyProjectStack(Stack):
             peer= ec2.Peer.any_ipv4(),
             connection= ec2.Port.tcp(443),
             description= "allow https"
+        )
+
+        webserver_SG.add_ingress_rule(
+            peer= ec2.Peer.ipv4("89.99.59.255/24"), #temporarely ip address
+            connection= ec2.Port.tcp(22),
+            description= "allow ssh, admin ip"
         )
 
         # creating SG MNGMT server.
@@ -220,6 +195,15 @@ class MyProjectStack(Stack):
             rule_action= ec2.Action.ALLOW,
         )
 
+        web_NACL.add_entry(
+            id= "allow SSH outbound",
+            cidr= ec2.AclCidr.any_ipv4(),
+            rule_number= 130,
+            traffic= ec2.AclTraffic.tcp_port(22),
+            direction= ec2.TrafficDirection.EGRESS,
+            rule_action= ec2.Action.ALLOW,
+        )
+
         # creating NACL for MNGMT server.
         mngmnt_NACL= ec2.NetworkAcl(
             self,
@@ -231,7 +215,7 @@ class MyProjectStack(Stack):
 
         mngmnt_NACL.add_entry(
             id= "allow SSH inbound",
-            cidr= ec2.AclCidr.ipv4("192.168.178.1/24"),
+            cidr= ec2.AclCidr.ipv4("89.99.59.255/24"), #temporarely ip address.
             rule_number= 140,
             traffic= ec2.AclTraffic.tcp_port(22),
             direction= ec2.TrafficDirection.INGRESS,
@@ -267,7 +251,7 @@ class MyProjectStack(Stack):
 
         mngmnt_NACL.add_entry(
             id = "allow RDP inbound",
-            cidr = ec2.AclCidr.ipv4("192.168.178.1/24"), #temporarely ip address 
+            cidr = ec2.AclCidr.ipv4("89.99.59.255/24"), #temporarely ip address.
             rule_number = 160,
             traffic = ec2.AclTraffic.tcp_port(3389),
             direction = ec2.TrafficDirection.INGRESS,
