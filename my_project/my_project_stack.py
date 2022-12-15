@@ -4,7 +4,11 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_iam as iam,
     aws_s3_deployment as s3deploy,
+    aws_backup as backup,
     aws_kms as kms,
+    aws_events as events,
+    RemovalPolicy,
+    Duration,
     Stack,    
 )
 from constructs import Construct
@@ -322,10 +326,6 @@ class MyProjectStack(Stack):
             destination_bucket= bucket,
         )
 
-        # web_userdata= web_server.user_data.add_s3_download_command(
-        #     bucket= bucket,
-        #     bucket_key= "webserver_userdata.sh",
-        # )
         web_userdata= ec2.UserData.for_linux()
         script_path= web_userdata.add_s3_download_command(
             bucket= bucket,
@@ -396,6 +396,34 @@ class MyProjectStack(Stack):
             )]
         )
 
+        # create backupvault
+        backup_vault= backup.BackupVault(
+            self,
+            "backup_vault",
+            backup_vault_name= "backup_vault",
+            removal_policy= RemovalPolicy.DESTROY
+        )
+
+        # create backupplan
+        backup_plan= backup.BackupPlan(
+            self,
+            "backup_plan",
+            backup_plan_name= "backup_plan",
+            backup_vault= backup_vault,    
+        )
+
+        backup_plan.add_selection(
+            "backup_selection",
+            resources= [backup.BackupResource.from_ec2_instance(web_server)]
+        )
+
+        backup_plan.add_rule(backup.BackupPlanRule(
+            schedule_expression= events.Schedule.cron(
+                hour= "15",
+                minute= "30"
+            ),
+            delete_after= Duration.days(7),
+        ))
         
         
         
