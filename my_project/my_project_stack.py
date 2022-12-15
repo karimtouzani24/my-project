@@ -2,6 +2,7 @@ import aws_cdk as cdk
 from aws_cdk import (
     aws_ec2 as ec2,
     aws_s3 as s3,
+    aws_iam as iam,
     aws_s3_deployment as s3deploy,
     aws_kms as kms,
     Stack,    
@@ -303,6 +304,37 @@ class MyProjectStack(Stack):
             rule_action = ec2.Action.ALLOW,
         )
 
+        # creating a bucket
+        bucket = s3.Bucket(
+            self, 
+            "project_bucket",
+            bucket_name= "bucket-project-karim24",
+            encryption= s3.BucketEncryption.KMS,
+            versioned= True,
+            removal_policy= cdk.RemovalPolicy.DESTROY,
+            auto_delete_objects= True
+        )
+        # upload a files in the bucket.
+        userdate_upload= s3deploy.BucketDeployment(
+            self, 
+            "DeployS3",
+            sources=[s3deploy.Source.asset("./asset-folder")],
+            destination_bucket= bucket,
+        )
+
+        # web_userdata= web_server.user_data.add_s3_download_command(
+        #     bucket= bucket,
+        #     bucket_key= "webserver_userdata.sh",
+        # )
+        web_userdata= ec2.UserData.for_linux()
+        script_path= web_userdata.add_s3_download_command(
+            bucket= bucket,
+            bucket_key= "webserver_userdata.sh",
+        )
+
+        # web_server.user_data.add_execute_file_command(file_path= web_userdata)
+        web_userdata.add_execute_file_command(file_path= script_path)
+
         # creating linux AMI for the WEB server.
         amzn_linux = ec2.MachineImage.latest_amazon_linux(
             generation=ec2.AmazonLinuxGeneration.AMAZON_LINUX_2,
@@ -323,6 +355,7 @@ class MyProjectStack(Stack):
             availability_zone= "eu-central-1a",
             machine_image= amzn_linux,
             security_group= webserver_SG,
+            user_data= web_userdata,
             key_name= "Karim_KP",
             instance_type= ec2.InstanceType.of(
                 ec2.InstanceClass.T2,
@@ -332,10 +365,14 @@ class MyProjectStack(Stack):
                 volume= ec2.BlockDeviceVolume.ebs(
                     volume_size= 8,
                     encrypted= True,
-                    delete_on_termination= True,
-                )
-            )]
+                    delete_on_termination= True,))],
+            role=iam.Role(
+                self, "Role for S3",
+                assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
+                description="Webserver role"),      
         )
+
+        bucket.grant_read(web_server)
 
         #creating instance, MMGMT serever, windows.
         mngmt_server = ec2.Instance(
@@ -359,57 +396,6 @@ class MyProjectStack(Stack):
             )]
         )
 
-        # creating a bucket
-        bucket = s3.Bucket(
-            self, 
-            "project_bucket",
-            bucket_name= "bucket-project-karim24",
-            encryption= s3.BucketEncryption.KMS,
-            versioned= True,
-            removal_policy= cdk.RemovalPolicy.DESTROY,
-            auto_delete_objects= True
-        )
-        # upload a files in the bucket.
-        userdate_upload= s3deploy.BucketDeployment(
-            self, 
-            "DeployS3",
-            sources=[s3deploy.Source.asset("./asset-folder")],
-            destination_bucket= bucket,
-        )
-        bucket.grant_read(web_server)
-
-        web_userdata= web_server.user_data.add_s3_download_command(
-            bucket= bucket,
-            bucket_key= "webserver_userdata.sh",
-        )
-
-        web_server.user_data.add_execute_file_command(file_path= web_userdata)
-
-        # web_server.user_data.add_s3_download_command(
-        #     bucket= bucket,
-        #     bucket_key= "index.html"
-        # )
-
         
-
-        # web_server.user_data.add_commands("chmod 755 -R /var/www/html/")
-
-        # web_server.user_data.add_execute_file_command(file_path= "/var/www/html")
         
-
-        # mngmt_kms = kms.Key(self, "mngmtKey",
-            # enable_key_rotation= True,)
-        
-        # mngmt_key_pair = ec2.CfnKeyPair(
-        #     self, 
-        #     "MngmtKeyPair",
-        #     key_name="mngmtKey",
-        # )
-
-        # websrv_key_pair = ec2.CfnKeyPair(
-        #     self, 
-        #     "WebsrvKeyPair",
-        #     key_name="websrvKey",
-        # )
-
         
