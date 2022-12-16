@@ -1,5 +1,5 @@
-##project: 1.0
+## project: 1.0
 
-###VPC
+### VPC
 - 2 VPCs
     * VPC1
