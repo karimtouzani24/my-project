@@ -1,11 +1,13 @@
-## project: 1.0
+## Project: 1.0
 
 ### Demands
 - 2 VPCs in region Frankfurt 
     - VPC1: 10.10.10.0/24
         - 2 public subnets: mask /25
+            - 1 subnet with the web server and the other subnet is extra.
     - VPC2: 10.20.20.0/24
         - 2 public subnets: mask /25
+            - 1 subnet with the managment server and the other subnet is extra.
 - VPCs are connected with a VPC peering connection.  
 - The subnets are protected:
     - NACL  
