@@ -13,12 +13,14 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+ip_admin_home = "89.99.59.255/24"
+
 class MyProjectStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # creating vpc, webserver.
+        ########## creating vpc, webserver.####################################################################
         vpc1 = ec2.Vpc(
             self, 
             "Vpc_W",
@@ -31,7 +33,7 @@ class MyProjectStack(Stack):
                     cidr_mask = 25)],
         )
 
-        # creating vpc, managment server.
+        ########## creating vpc, managment server.#############################################################
         vpc2 = ec2.Vpc(
             self, 
             "Vpc_M",
@@ -44,7 +46,7 @@ class MyProjectStack(Stack):
                     cidr_mask=25,),]
         )
 
-        # creating a vpc peering connection.
+        ########## creating a vpc peering connection.###########################################################
         cfn_cPCPeering_connection = ec2.CfnVPCPeeringConnection(
             self, 
             "My_vpcPeeringConnection",
@@ -71,7 +73,7 @@ class MyProjectStack(Stack):
                 vpc_peering_connection_id= cfn_cPCPeering_connection.ref
             )
 
-        # creating SG webserver
+        ########## creating SG webserver######################################################################
         webserver_SG = ec2.SecurityGroup(
             self, 
             "web_SG",
@@ -93,12 +95,18 @@ class MyProjectStack(Stack):
         )
 
         webserver_SG.add_ingress_rule(
-            peer= ec2.Peer.ipv4("89.99.59.255/24"), #temporarely ip address
+            peer= ec2.Peer.ipv4("10.20.20.0/24"), #de private ip address van mngmt server voor connection ssh tussen admin en web server.
             connection= ec2.Port.tcp(22),
-            description= "allow ssh, admin ip"
+            description= "allow ssh, mngmt server"
         )
 
-        # creating SG MNGMT server.
+        webserver_SG.add_ingress_rule(
+            peer= ec2.Peer.ipv4(ip_admin_home), #de public ip van admin home voor connection ssh tussen admin home en web server.
+            connection= ec2.Port.tcp(22),
+            description= "allow ssh, mngmt server"
+        )
+
+        ########## creating SG MNGMT server.####################################################################
         mngmt_SG = ec2.SecurityGroup(
             self, 
             "mngmt_SG",
@@ -118,17 +126,19 @@ class MyProjectStack(Stack):
             description= "allow https"
         )
         mngmt_SG.add_ingress_rule(
-            peer= ec2.Peer.ipv4("89.99.59.255/24"), #temporarely ip address
+            # peer= ec2.Peer.ipv4("89.99.59.255/24"), #temporarely ip address admin home.
+            peer= ec2.Peer.ipv4(ip_admin_home),
             connection= ec2.Port.tcp(22),
             description= "allow ssh, admin ip"
         )
         mngmt_SG.add_ingress_rule(
-            peer= ec2.Peer.ipv4("89.99.59.255/24"), #temporarely ip address
+            # peer= ec2.Peer.ipv4("89.99.59.255/24"), #temporarely ip address admin home.
+            peer= ec2.Peer.ipv4(ip_admin_home),
             connection= ec2.Port.tcp(3389),
             description= "allow rdp, admin ip"
         )
 
-        # creating NACL for webserver.
+        ########## creating NACL for webserver.#################################################################
         web_NACL= ec2.NetworkAcl(
             self,
             "web_NACL",
@@ -140,7 +150,7 @@ class MyProjectStack(Stack):
         web_NACL.add_entry(
             id= "allow HTTP inbound",
             cidr= ec2.AclCidr.any_ipv4(),
-            rule_number= 100,
+            rule_number= 110,
             traffic= ec2.AclTraffic.tcp_port(80),
             direction= ec2.TrafficDirection.INGRESS,
             rule_action= ec2.Action.ALLOW,
@@ -149,7 +159,7 @@ class MyProjectStack(Stack):
         web_NACL.add_entry(
             id= "allow HTTP outbound",
             cidr= ec2.AclCidr.any_ipv4(),
-            rule_number= 100,
+            rule_number= 110,
             traffic= ec2.AclTraffic.tcp_port(80),
             direction= ec2.TrafficDirection.EGRESS,
             rule_action= ec2.Action.ALLOW,
@@ -158,7 +168,7 @@ class MyProjectStack(Stack):
         web_NACL.add_entry(
             id= "allow HTTPS inbound",
             cidr= ec2.AclCidr.any_ipv4(),
-            rule_number= 110,
+            rule_number= 120,
             traffic= ec2.AclTraffic.tcp_port(443),
             direction= ec2.TrafficDirection.INGRESS,
             rule_action= ec2.Action.ALLOW,
@@ -167,16 +177,35 @@ class MyProjectStack(Stack):
         web_NACL.add_entry(
             id= "allow HTTPS outbound",
             cidr= ec2.AclCidr.any_ipv4(),
-            rule_number= 110,
+            rule_number= 120,
             traffic= ec2.AclTraffic.tcp_port(443),
             direction= ec2.TrafficDirection.EGRESS,
             rule_action= ec2.Action.ALLOW,
         )
 
         web_NACL.add_entry(
+            id= "allow SSH inbound admin home",
+            # cidr= ec2.AclCidr.ipv4("89.99.59.255/24"), # tijdelijk IP address from admins home. 
+            cidr= ec2.AclCidr.ipv4(ip_admin_home),
+            rule_number= 130,
+            traffic= ec2.AclTraffic.tcp_port(22),
+            direction= ec2.TrafficDirection.INGRESS,
+            rule_action= ec2.Action.ALLOW,
+        )
+
+        web_NACL.add_entry(
+            id= "allow SSH inbound mngmt server",
+            cidr= ec2.AclCidr.ipv4("10.20.20.0/24"), #private ip address block from mngmt server.
+            rule_number= 140,
+            traffic= ec2.AclTraffic.tcp_port(22),
+            direction= ec2.TrafficDirection.INGRESS,
+            rule_action= ec2.Action.ALLOW,
+        )
+
+        web_NACL.add_entry(
             id= "allow ephemeral inbound",
             cidr= ec2.AclCidr.any_ipv4(),
-            rule_number= 120,
+            rule_number= 150,
             traffic= ec2.AclTraffic.tcp_port_range(1024, 65535),
             direction= ec2.TrafficDirection.INGRESS,
             rule_action= ec2.Action.ALLOW,
@@ -185,31 +214,13 @@ class MyProjectStack(Stack):
         web_NACL.add_entry(
             id= "allow ephemerel outbound",
             cidr= ec2.AclCidr.any_ipv4(),
-            rule_number= 120,
+            rule_number= 150,
             traffic= ec2.AclTraffic.tcp_port_range(1024, 65535),
             direction= ec2.TrafficDirection.EGRESS,
             rule_action= ec2.Action.ALLOW,
         )
 
-        web_NACL.add_entry(
-            id= "allow SSH inbound",
-            cidr= ec2.AclCidr.any_ipv4(),
-            rule_number= 130,
-            traffic= ec2.AclTraffic.tcp_port(22),
-            direction= ec2.TrafficDirection.INGRESS,
-            rule_action= ec2.Action.ALLOW,
-        )
-
-        web_NACL.add_entry(
-            id= "allow SSH outbound",
-            cidr= ec2.AclCidr.any_ipv4(),
-            rule_number= 130,
-            traffic= ec2.AclTraffic.tcp_port(22),
-            direction= ec2.TrafficDirection.EGRESS,
-            rule_action= ec2.Action.ALLOW,
-        )
-
-        # creating NACL for MNGMT server.
+        ######### creating NACL for MNGMT server.##############################################################
         mngmnt_NACL= ec2.NetworkAcl(
             self,
             "mngmnt_NACL",
@@ -220,8 +231,9 @@ class MyProjectStack(Stack):
 
         mngmnt_NACL.add_entry(
             id= "allow SSH inbound",
-            cidr= ec2.AclCidr.ipv4("89.99.59.255/24"), #temporarely ip address.
-            rule_number= 140,
+            # cidr= ec2.AclCidr.ipv4("89.99.59.255/24"), #temporarely ip address admin home.
+            cidr= ec2.AclCidr.ipv4(ip_admin_home),
+            rule_number= 200,
             traffic= ec2.AclTraffic.tcp_port(22),
             direction= ec2.TrafficDirection.INGRESS,
             rule_action= ec2.Action.ALLOW,
@@ -230,7 +242,7 @@ class MyProjectStack(Stack):
         mngmnt_NACL.add_entry(
             id = "allow SSH outbound",
             cidr = ec2.AclCidr.any_ipv4(), 
-            rule_number = 140,
+            rule_number = 210,
             traffic = ec2.AclTraffic.tcp_port(22),
             direction = ec2.TrafficDirection.EGRESS,
             rule_action = ec2.Action.ALLOW,
@@ -239,7 +251,7 @@ class MyProjectStack(Stack):
         mngmnt_NACL.add_entry(
             id = "allow ephemeral inbound",
             cidr = ec2.AclCidr.any_ipv4(), 
-            rule_number = 150,
+            rule_number = 220,
             traffic = ec2.AclTraffic.tcp_port_range(1024, 65535),
             direction = ec2.TrafficDirection.INGRESS,
             rule_action = ec2.Action.ALLOW,
@@ -248,7 +260,7 @@ class MyProjectStack(Stack):
         mngmnt_NACL.add_entry(
             id = "allow ephemeral outbound",
             cidr = ec2.AclCidr.any_ipv4(), 
-            rule_number = 150,
+            rule_number = 230,
             traffic = ec2.AclTraffic.tcp_port_range(1024, 65535),
             direction = ec2.TrafficDirection.EGRESS,
             rule_action = ec2.Action.ALLOW,
@@ -256,8 +268,9 @@ class MyProjectStack(Stack):
 
         mngmnt_NACL.add_entry(
             id = "allow RDP inbound",
-            cidr = ec2.AclCidr.ipv4("89.99.59.255/24"), #temporarely ip address.
-            rule_number = 160,
+            # cidr = ec2.AclCidr.ipv4("89.99.59.255/24"), #temporarely ip address admin home.
+            cidr = ec2.AclCidr.ipv4(ip_admin_home),
+            rule_number = 240,
             traffic = ec2.AclTraffic.tcp_port(3389),
             direction = ec2.TrafficDirection.INGRESS,
             rule_action = ec2.Action.ALLOW,
@@ -266,7 +279,7 @@ class MyProjectStack(Stack):
         mngmnt_NACL.add_entry(
             id = "allow RDP outbound",
             cidr = ec2.AclCidr.any_ipv4(), 
-            rule_number = 160,
+            rule_number = 250,
             traffic = ec2.AclTraffic.tcp_port(3389),
             direction = ec2.TrafficDirection.EGRESS,
             rule_action = ec2.Action.ALLOW,
@@ -275,7 +288,7 @@ class MyProjectStack(Stack):
         mngmnt_NACL.add_entry(
             id = "allow HTTP inbound",
             cidr = ec2.AclCidr.any_ipv4(), 
-            rule_number = 170,
+            rule_number = 260,
             traffic = ec2.AclTraffic.tcp_port(80),
             direction = ec2.TrafficDirection.INGRESS,
             rule_action = ec2.Action.ALLOW,
@@ -284,7 +297,7 @@ class MyProjectStack(Stack):
         mngmnt_NACL.add_entry(
             id = "allow HTTP outbound",
             cidr = ec2.AclCidr.any_ipv4(), 
-            rule_number = 170,
+            rule_number = 270,
             traffic = ec2.AclTraffic.tcp_port(80),
             direction = ec2.TrafficDirection.EGRESS,
             rule_action = ec2.Action.ALLOW,
@@ -293,7 +306,7 @@ class MyProjectStack(Stack):
         mngmnt_NACL.add_entry(
             id = "allow HTTPS inbound",
             cidr = ec2.AclCidr.any_ipv4(), 
-            rule_number = 180,
+            rule_number = 280,
             traffic = ec2.AclTraffic.tcp_port(443),
             direction = ec2.TrafficDirection.INGRESS,
             rule_action = ec2.Action.ALLOW,
@@ -302,13 +315,13 @@ class MyProjectStack(Stack):
         mngmnt_NACL.add_entry(
             id = "allow HTTPS outbound",
             cidr = ec2.AclCidr.any_ipv4(), 
-            rule_number = 180,
+            rule_number = 290,
             traffic = ec2.AclTraffic.tcp_port(443),
             direction = ec2.TrafficDirection.EGRESS,
             rule_action = ec2.Action.ALLOW,
         )
 
-        # creating a bucket
+        ########## creating a bucket############################################################################
         bucket = s3.Bucket(
             self, 
             "project_bucket",
@@ -335,19 +348,22 @@ class MyProjectStack(Stack):
         # web_server.user_data.add_execute_file_command(file_path= web_userdata)
         web_userdata.add_execute_file_command(file_path= script_path)
 
-        # creating linux AMI for the WEB server.
+        # add permission
+        web_userdata.add_commands("chmod 755 -R /var/www/html/")
+
+        ########## creating linux AMI for the WEB server.###################################################
         amzn_linux = ec2.MachineImage.latest_amazon_linux(
             generation=ec2.AmazonLinuxGeneration.AMAZON_LINUX_2,
             edition=ec2.AmazonLinuxEdition.STANDARD,
             storage=ec2.AmazonLinuxStorage.GENERAL_PURPOSE
         )
        
-       #creating Windows Ami for the MGMT server.
+       ###########creating Windows Ami for the MGMT server.##################################################
         amzn_windows = ec2.MachineImage.latest_windows(
             version=ec2.WindowsVersion.WINDOWS_SERVER_2022_ENGLISH_FULL_BASE
         )
 
-       #creating instance, WEB server, linux.
+       ##################creating instance, WEB server, linux.###############################################
         web_server = ec2.Instance(
             self, 
             "web_instance",
@@ -366,15 +382,15 @@ class MyProjectStack(Stack):
                     volume_size= 8,
                     encrypted= True,
                     delete_on_termination= True,))],
-            role=iam.Role(
-                self, "Role for S3",
-                assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
-                description="Webserver role"),      
+            # role=iam.Role(
+            #     self, "Role for S3",
+            #     assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
+            #     description="Webserver role"),      
         )
-
+        
         bucket.grant_read(web_server)
 
-        #creating instance, MMGMT serever, windows.
+        ###########creating instance, MMGMT serever, windows.####################################################
         mngmt_server = ec2.Instance(
             self, 
             "mngmt_instance",
@@ -396,7 +412,7 @@ class MyProjectStack(Stack):
             )]
         )
 
-        # create backupvault
+        ##########create backupvault################################################################################
         backup_vault= backup.BackupVault(
             self,
             "backup_vault",

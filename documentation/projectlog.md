@@ -29,7 +29,34 @@ The code is easy to find in the official aws cdk documentation.
 
 ____
 
-# Log [date-yesterday]
+# Log 16-12-22
+
+## One Sentence summary of the day
+Testing the deployment
+## Challenges
+Couldn't ssh from admin server to webserver.
+## Solutions
+changed ip destination in the SG rules
+
+# Log 19-12-22
+
+## One Sentence summary of the day
+Testing the deployment
+## Challenges
+Couldn't ssh from admin server to webserver
+## Solutions
+Used private ip address instead of the public ip address.
+
+# Log 20-12-22
+
+## One Sentence summary of the day
+testing deployment webserver
+## Challenges
+webserver not reachable for public
+## Solutions
+It worked before. No changes made. Tried to solve it by checkinig the SG, the NACL's and the userdata.
+
+# Log 
 
 ## One Sentence summary of the day
 
